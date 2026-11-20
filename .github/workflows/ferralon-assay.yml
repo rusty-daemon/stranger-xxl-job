@@ -1,0 +1,46 @@
+name: Ferralon Assay
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  assay:
+    runs-on: ubuntu-latest
+    permissions:
+      # actions/checkout, and the scan reads the checked-out tree.
+      contents: read
+      # The pinned-Issue dashboard surface (the `issue` input, on by default).
+      issues: write
+      # The sticky PR-comment surface (the `pr-comment` input, on by default).
+      pull-requests: write
+      # The SARIF upload step below (the `code-scanning` input, on by default).
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run the Ferralon Assay
+        id: assay
+        uses: ferralon-ai/ferralon-assay@v0.6
+        with:
+          mode: baseline
+          target: .
+          # Recommended: consume the public advisory corpus for real coverage.
+          # Left on its default ref (main) on purpose — new advisories land there
+          # continuously, so pinning this ref would freeze your vulnerability intel.
+          # Omit it and the scan falls back to a small built-in table (a few
+          # hand-picked test cases, not advisory coverage).
+          advisory-corpus-repo: ferralon-ai/vulnerability-corpus
+
+      # The Action materializes report.sarif.json; the upload to code scanning is this
+      # step, so drop it and the `code-scanning` surface produces a file and nothing else.
+      - name: Upload the SARIF to code scanning
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: ${{ steps.assay.outputs.sarif-file }}
+          category: ferralon-assay
